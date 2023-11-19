@@ -1,108 +1,105 @@
-//login elements 
-const login = document.querySelector(".login")
-const loginForm = login.querySelector(".login__form")
-const loginInput = login.querySelector(".login__input")
+let box;
 
-//chat elements
-const chat = document.querySelector(".chat")
-const chatForm = chat.querySelector(".chat__form")
-const chatInput = chat.querySelector(".chat__input")
-const chatMessages = chat.querySelector(".chat__messages")
+const user = { id: "", name: "", color: getRandomColor() };
 
-const colors = [
-  "cadetblue",
-  "darkogoldenrod",
-  "cornflowerblue",
-  "darkkhaki",
-  "hotpink",
-  "gold"
-]
+let websocket;
 
-const user = {id: "", name: "", color: "" }
-
-let websocket
-
-const createMessageSelfElement = (content) => {
-    const div = document.createElement("div")
-
-    div.classList.add("message__self")
-    div.innerHTML = content
-
-    return div
+function getRandomColor() {
+  const colors = ["#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6", "#34495e"];
+  const randomIndex = Math.floor(Math.random() * colors.length);
+  return colors[randomIndex];
 }
 
-const createMessageOtherElement = (content, sender, senderColor) => {
-  const div = document.createElement("div")
-  const span = document.createElement("span")
-
-  div.classList.add("message__other")
-
-  div.classList.add("message__self")
-  span.classList.add("message__sender")
-  span.style.color = senderColor
-
-  div.appendChild(span)
-
-  span.innerHTML = sender
-  div.innerHTML += content
-
-  return div
-}
-
-const getRandomColor = () => {
-  const randomIndex = Math.floor(Math.random() * colors.length)
-  return colors[randomIndex]
-}
-
-const scrollScreen = () => {
-  window.scrollTo({
-    top: document.body.scrollHeight,
-    behavior : "smooth"
-  })
-}
-
-const processMessage = ({ data }) => {
-    const { userId, userName, userColor, content } = JSON.parse(data)
-
-    const message = 
-        userId == user.id
-             ? createMessageSelfElement(content) 
-             : createMessageOtherElement(content, userName, userColor) 
-
-
-    chatMessages.appendChild(message)
-
-    scrollScreen()
-}
-
-const handleLogin = (event) => {
-  event.preventDefault()
-
-  user.id = crypto.randomUUID()
-  user.name = loginInput.value
-  user.color = getRandomColor()
-
-  login.style.display = "none"
-  chat.style.display = "flex"
-
-  websocket = new WebSocket("wss://chat-backend-bcsc.onrender.com")
-  websocket.onmessage = processMessage
-}
-
-const sendMessage = (event) => {
-  event.preventDefault()
-
-  const message = {
-    userId: user.id,
-    userName: user.name,
-    userColor: user.color,
-    content: chatInput.value
+function handleDragStart(event) {
+  if (websocket.readyState !== WebSocket.OPEN) {
+    return;
   }
 
-  websocket.send(JSON.stringify(message))
+  const startCoords = { x: event.clientX, y: event.clientY };
+  const dragData = { type: "dragStart", startCoords };
+  websocket.send(JSON.stringify(dragData));
 
-  chatInput.value = ""
+  document.addEventListener("mousemove", handleDragging);
+  document.addEventListener("mouseup", handleDragEnd);
+
+  function handleDragging(event) {
+    if (websocket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const currentCoords = { x: event.clientX, y: event.clientY };
+    const dragData = { type: "dragging", currentCoords };
+    websocket.send(JSON.stringify(dragData));
+  }
+
+  function handleDragEnd() {
+    if (websocket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    document.removeEventListener("mousemove", handleDragging);
+    document.removeEventListener("mouseup", handleDragEnd);
+    const dragData = { type: "dragEnd" };
+    websocket.send(JSON.stringify(dragData));
+  }
 }
 
-loginForm.addEventListener("submit", handleLogin)
-chatForm.addEventListener("submit", sendMessage)
+function processDragData(dragData) {
+  switch (dragData.type) {
+    case "dragStart":
+      // início do drag (se necessário)
+      break;
+    case "dragging":
+      // posição durante o drag
+      box.style.left = dragData.currentCoords.x + "px";
+      box.style.top = dragData.currentCoords.y + "px";
+      break;
+    case "dragEnd":
+      // fim do drag (se necessário)
+      break;
+    case "initialPosition":
+      // Configura a posição inicial da caixa quando um novo usuário se conecta
+      box.style.left = dragData.position.x + "px";
+      box.style.top = dragData.position.y + "px";
+      break;
+  }
+}
+
+function createDraggableBox() {
+  const newBox = document.createElement("div");
+  newBox.classList.add("draggable-box");
+  newBox.style.backgroundColor = user.color;
+  newBox.style.width = "100px";
+  newBox.style.height = "100px";
+  newBox.style.position = "absolute"; 
+  document.body.appendChild(newBox);
+
+  return newBox;
+}
+
+function promptForUsername() {
+  const username = prompt("Digite seu nome de usuário:");
+  if (username) {
+    user.id = crypto.randomUUID();
+    user.name = username;
+    websocket = new WebSocket("ws://localhost:8080");
+
+    box = createDraggableBox();
+
+    websocket.onmessage = event => {
+      const dragData = JSON.parse(event.data);
+      processDragData(dragData);
+    };
+
+    // Solicita a posição inicial da caixa quando um novo usuário se conecta
+    websocket.onopen = () => {
+      websocket.send(JSON.stringify({ type: "requestInitialPosition" }));
+    };
+
+    box.addEventListener("mousedown", handleDragStart);
+  } else {
+    // cancelou o prompt
+  }
+}
+
+promptForUsername();
