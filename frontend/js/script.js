@@ -26,11 +26,15 @@ function handleDragStart(event) {
     if (websocket.readyState !== WebSocket.OPEN) {
       return;
     }
-
+  
     const currentCoords = { x: event.clientX, y: event.clientY };
     const dragData = { type: "dragging", currentCoords };
+  
+    // Atualiza a posição da caixa no servidor
+    websocket.send(JSON.stringify({ type: "updatePosition", position: currentCoords }));
     websocket.send(JSON.stringify(dragData));
   }
+  
 
   function handleDragEnd() {
     if (websocket.readyState !== WebSocket.OPEN) {
