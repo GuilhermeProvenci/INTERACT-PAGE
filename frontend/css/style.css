@@ -1,12 +1,27 @@
 body {
   margin: 0;
   overflow: hidden;
+  font-family: 'Arial', sans-serif;
+}
+
+.kanban-board {
+  display: flex;
+  height: 100vh;
+}
+
+.column {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ccc;
+  overflow-y: auto;
+  height: 100%;
 }
 
 .draggable-box {
   width: 100px;
   height: 100px;
-  background-color: #3498db;
-  position: absolute;
+  position: relative;
   cursor: move;
+  background-color: #3498db;
+  margin-bottom: 10px;
 }
